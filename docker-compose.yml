@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: workflow-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-workflowuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-workflowpass}
+      POSTGRES_DB: ${POSTGRES_DB:-workflows}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-workflowuser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - workflow-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: workflow-backend
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-workflowuser}:${POSTGRES_PASSWORD:-workflowpass}@postgres:5432/${POSTGRES_DB:-workflows}
+      - CHROMA_PATH=/app/.chroma
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SERPAPI_KEY=${SERPAPI_KEY}
+      - BRAVE_API_KEY=${BRAVE_API_KEY}
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/app/.chroma
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - workflow-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: workflow-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - workflow-network
+    restart: unless-stopped
+
+networks:
+  workflow-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  chroma_data:
