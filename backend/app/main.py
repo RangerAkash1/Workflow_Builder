@@ -260,7 +260,7 @@ async def call_llm(provider: str, prompt: str, settings: Settings, model: Option
         if not settings.gemini_api_key:
             raise HTTPException(status_code=400, detail="Gemini provider selected but GEMINI_API_KEY is missing")
         genai.configure(api_key=settings.gemini_api_key)
-        model_name = model or "gemini-1.5-flash"
+        model_name = model or "gemini-2.5-flash"
         gemini_model = genai.GenerativeModel(model_name)
         response = await asyncio.to_thread(gemini_model.generate_content, prompt)
         return response.text
