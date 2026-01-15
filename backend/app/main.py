@@ -36,7 +36,7 @@ from .database import (
 # FastAPI initialization with proper CORS configuration
 settings = get_settings()
 
-app = FastAPI(title="No-Code Workflow API", version="0.3.0")
+app = FastAPI(title="Workflow Builder API", version="0.3.0")
 
 # Configure CORS with environment-based origins
 app.add_middleware(
