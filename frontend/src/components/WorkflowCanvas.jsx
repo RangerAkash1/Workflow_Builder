@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import ReactFlow, { 
   Background, 
   Controls, 
@@ -10,142 +10,122 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-// Canvas responsible for node/edge interactions with improved UX.
 export default function WorkflowCanvas({ nodes, edges, setNodes, setEdges, onSelectNode }) {
-  // Use ReactFlow's built-in state management for smoother interactions
+  
+  // 1. Internal React Flow state (handles smooth 60fps dragging)
   const [localNodes, setLocalNodes, onNodesChange] = useNodesState(nodes);
   const [localEdges, setLocalEdges, onEdgesChange] = useEdgesState(edges);
 
-  // Sync local state with parent when changes are finalized
+  // 2. Sync Local State if Parent 'nodes' changes externally
+  useEffect(() => {
+    setLocalNodes(nodes || []);
+  }, [nodes, setLocalNodes]);
+
+  useEffect(() => {
+    setLocalEdges(edges || []);
+  }, [edges, setLocalEdges]);
+
+  // 3. Handle Node Changes (Dragging, Selecting, Deleting)
   const handleNodesChange = useCallback((changes) => {
+    // Apply changes locally first so the UI remains responsive
     onNodesChange(changes);
     
-    // Update parent state after internal state is updated
-    const hasPositionChange = changes.some(c => c.type === 'position' && c.dragging === false);
-    const hasRemove = changes.some(c => c.type === 'remove');
+    // Only update the parent state when a change is "finalized"
+    // (e.g., node dragging stopped, or a node was removed)
+    const isFinalized = changes.some(
+      (c) => c.type === 'remove' || (c.type === 'position' && !c.dragging)
+    );
     
-    if (hasPositionChange || hasRemove) {
-      setTimeout(() => {
-        setLocalNodes((currentNodes) => {
-          setNodes(currentNodes);
-          return currentNodes;
-        });
-      }, 0);
+    if (isFinalized) {
+      setLocalNodes((currentNodes) => {
+        setNodes([...currentNodes]); // Push to parent
+        return currentNodes;
+      });
     }
   }, [onNodesChange, setNodes, setLocalNodes]);
 
+  // 4. Handle Edge Changes
   const handleEdgesChange = useCallback((changes) => {
     onEdgesChange(changes);
-    
-    // Update parent state for edge changes
-    setTimeout(() => {
-      setLocalEdges((currentEdges) => {
-        setEdges(currentEdges);
-        return currentEdges;
-      });
-    }, 0);
+    setLocalEdges((currentEdges) => {
+      setEdges([...currentEdges]); // Push to parent
+      return currentEdges;
+    });
   }, [onEdgesChange, setEdges, setLocalEdges]);
 
-  // Handle new connections between nodes
+  // 5. Handle New Connections
   const onConnect = useCallback((params) => {
+    const edgeConfig = { 
+      ...params, 
+      animated: true, 
+      type: 'smoothstep',
+      style: { stroke: '#22d3ee' } 
+    };
+    
     setLocalEdges((eds) => {
-      const newEdges = addEdge({ ...params, animated: true, type: 'smoothstep' }, eds);
+      const newEdges = addEdge(edgeConfig, eds);
       setEdges(newEdges);
       return newEdges;
     });
   }, [setLocalEdges, setEdges]);
 
-  // Handle node selection for configuration
+  // 6. Interaction Handlers
   const onNodeClick = useCallback((event, node) => {
     event.stopPropagation();
     onSelectNode(node.id);
   }, [onSelectNode]);
 
-  // Clear selection when clicking canvas background
   const onPaneClick = useCallback(() => {
     onSelectNode(null);
   }, [onSelectNode]);
 
-  // Sync nodes from parent (when loading workflow)
-  const displayNodes = nodes.length !== localNodes.length ? nodes : localNodes;
-  const displayEdges = edges.length !== localEdges.length ? edges : localEdges;
-
   return (
-    <div style={{ height: "60vh", width: "100%", position: "relative" }}>
+    <div style={{ height: "60vh", width: "100%", position: "relative", border: "1px solid #1f2937", borderRadius: "8px", overflow: "hidden" }}>
       <ReactFlow
-        nodes={displayNodes}
-        edges={displayEdges}
+        // Important: Always use the local versions here
+        nodes={localNodes}
+        edges={localEdges}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
         
-        // UX improvements for better interaction
-        fitView
-        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
-        minZoom={0.3}
-        maxZoom={2}
-        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-        
-        // Clear interaction modes
-        panOnScroll={false}  // Use middle mouse or space+drag for panning
-        panOnDrag={true}    // Left-click drag to pan canvas
-        selectionOnDrag={false}  // Disable box selection to avoid conflicts
-        zoomOnScroll={true}  // Scroll to zoom
-        zoomOnDoubleClick={false}  // Disable double-click zoom
-        
-        // Better connection behavior
-        connectionMode="loose"
-        snapToGrid={true}
-        snapGrid={[15, 15]}
-        
-        attributionPosition="bottom-left"
-        
-        // Improve node dragging feel
+        // Dragging & Interaction Settings
         nodesDraggable={true}
         nodesConnectable={true}
         elementsSelectable={true}
+        panOnDrag={true}
+        zoomOnScroll={true}
+        
+        // Grid & View Config
+        fitView
+        snapToGrid={true}
+        snapGrid={[15, 15]}
+        connectionMode="loose"
       >
         <Panel position="top-right" style={{
           background: "rgba(17, 24, 39, 0.9)",
-          padding: "8px 12px",
+          padding: "10px",
           borderRadius: "8px",
-          border: "1px solid #1f2937",
+          border: "1px solid #374151",
           fontSize: "12px",
-          color: "#9ca3af"
+          color: "#d1d5db"
         }}>
-          <div><strong>Controls:</strong></div>
-          <div>• Click & drag canvas to pan</div>
-          <div>• Click node to select/configure</div>
-          <div>• Drag node to move it</div>
-          <div>• Drag from handle to connect</div>
-          <div>• Scroll to zoom in/out</div>
+          <div style={{ marginBottom: "4px", color: "#22d3ee" }}><strong>Workflow Controls</strong></div>
+          <div>• Drag node to move</div>
+          <div>• Drag handles to connect</div>
+          <div>• Click node to edit data</div>
+          <div>• Backspace/Delete to remove</div>
         </Panel>
         
         <MiniMap 
           nodeColor={(node) => node.selected ? '#22d3ee' : '#374151'}
-          maskColor="rgba(0, 0, 0, 0.6)"
-          style={{
-            background: "#111827",
-            border: "1px solid #1f2937",
-            borderRadius: "4px"
-          }}
+          maskColor="rgba(0, 0, 0, 0.7)"
+          style={{ background: "#111827", border: "1px solid #1f2937" }}
         />
-        <Controls 
-          showInteractive={false}
-          style={{
-            background: "#111827",
-            border: "1px solid #1f2937",
-            borderRadius: "8px"
-          }} 
-        />
-        <Background 
-          gap={20} 
-          size={1}
-          color="#1f2937" 
-          variant="dots"
-        />
+        <Controls style={{ background: "#111827", border: "1px solid #1f2937", fill: "#fff" }} />
+        <Background gap={20} size={1} color="#374151" variant="dots" />
       </ReactFlow>
     </div>
   );
