@@ -35,7 +35,7 @@ export default function ChatPanel({ open, api, workflow }) {
         },
       ]);
     } catch (err) {
-      console.error(err);
+      console.error(err.response?.data?.detail || err.message);
       setMessages((prev) => [...prev, { role: "assistant", content: "Error running workflow" }]);
     } finally {
       setBusy(false);

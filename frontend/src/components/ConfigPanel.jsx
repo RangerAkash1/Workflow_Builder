@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 // Dynamic configuration form per node type; currently minimal fields for clarity.
 export default function ConfigPanel({ node, onChange, api }) {
@@ -8,37 +8,56 @@ export default function ConfigPanel({ node, onChange, api }) {
   const [uploadInfo, setUploadInfo] = useState("");
   const [collections, setCollections] = useState([]);
   const [loadingCollections, setLoadingCollections] = useState(false);
+  
+  // Cache to prevent repeated fetches
+  const collectionsCache = useRef({ data: null, timestamp: 0 });
+  const fetchInProgress = useRef(false);
+  const CACHE_DURATION = 30000; // 30 seconds
 
   useEffect(() => {
     setForm(node?.data?.params || {});
     setFile(null);
     setUploadInfo("");
+    
     // Fetch available collections when knowledge base node is selected.
     if (node?.data?.type === "knowledge_base") {
       fetchCollections();
     }
-  }, [node]);
+  }, [node?.id, node?.data?.type]); // Only re-fetch when node ID or type changes
 
   const fetchCollections = async () => {
+    // Check cache first
+    const now = Date.now();
+    if (collectionsCache.current.data && now - collectionsCache.current.timestamp < CACHE_DURATION) {
+      setCollections(collectionsCache.current.data);
+      return;
+    }
+
+    // Prevent concurrent fetches
+    if (fetchInProgress.current) {
+      return;
+    }
+
     try {
+      fetchInProgress.current = true;
       setLoadingCollections(true);
       const res = await api.get("/knowledge/collections");
-      setCollections(res.data.collections || []);
+      const fetchedCollections = res.data.collections || [];
+      
+      // Update cache
+      collectionsCache.current = {
+        data: fetchedCollections,
+        timestamp: now
+      };
+      
+      setCollections(fetchedCollections);
     } catch (err) {
       console.error("Failed to load collections:", err);
+      // Don't clear cache on error to allow offline viewing
     } finally {
       setLoadingCollections(false);
+      fetchInProgress.current = false;
     }
-  };
-
-  if (!node) {
-    return <div>Select a node to configure it.</div>;
-  }
-
-  const update = (key, value) => {
-    const next = { ...form, [key]: value };
-    setForm(next);
-    onChange(node.id, next);
   };
 
   const uploadToCollection = async () => {
@@ -59,6 +78,10 @@ export default function ConfigPanel({ node, onChange, api }) {
       };
       const res = await api.post("/knowledge/upload", fd, { params });
       setUploadInfo(`Stored ${res.data.chunks} chunks in ${res.data.collection}`);
+      
+      // Invalidate cache after successful upload to refresh collections
+      collectionsCache.current = { data: null, timestamp: 0 };
+      fetchCollections();
     } catch (err) {
       console.error(err);
       const detail = err?.response?.data?.detail || "Upload failed";
@@ -66,6 +89,16 @@ export default function ConfigPanel({ node, onChange, api }) {
     } finally {
       setUploading(false);
     }
+  };
+
+  if (!node) {
+    return <div>Select a node to configure it.</div>;
+  }
+
+  const update = (key, value) => {
+    const next = { ...form, [key]: value };
+    setForm(next);
+    onChange(node.id, next);
   };
 
   const renderFields = () => {
