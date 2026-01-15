@@ -35,7 +35,7 @@ header {
   padding: 12px;
   background: #111827;
   border-radius: 12px;
-  border: 1px solid #1f2937;
+  border: 1f2937;
 }
 
 h1 {
@@ -51,16 +51,23 @@ button {
   color: #0b1221;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
 }
 
 button:hover {
   background: #06b6d4;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+}
+
+button:active {
+  transform: translateY(0);
 }
 
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .list-title {
@@ -103,6 +110,48 @@ button:disabled {
 .chat-log .assistant {
   background: #34d39933;
   border: 1px solid #34d39955;
+}
+
+.config-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.config-fields label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.config-fields input,
+.config-fields select,
+.config-fields textarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: #0b1221;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 14px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.config-fields input:focus,
+.config-fields select:focus,
+.config-fields textarea:focus {
+  outline: none;
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.1);
+}
+
+.config-fields textarea {
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
 }
 
 /* Responsive design for tablets */
@@ -152,24 +201,156 @@ button:disabled {
   }
 }
 
-/* Ensure canvas adapts properly */
-.rf-viewport {
+/* ReactFlow Canvas Styling - CRITICAL for UX */
+.react-flow {
   background: #0b1221 !important;
 }
 
-.rf-node {
+.react-flow__viewport {
+  cursor: grab;
+}
+
+.react-flow__viewport.dragging {
+  cursor: grabbing;
+}
+
+/* Node Styling - Clear visual feedback */
+.react-flow__node {
   background: #1f2937;
   border: 2px solid #374151;
   border-radius: 8px;
-  padding: 10px;
+  padding: 12px 16px;
   color: #e2e8f0;
+  font-weight: 600;
+  min-width: 150px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.rf-node.selected {
+.react-flow__node:hover {
   border-color: #22d3ee;
-  box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+  box-shadow: 0 4px 16px rgba(34, 211, 238, 0.2);
+  transform: translateY(-1px);
 }
 
-.rf-edge {
+.react-flow__node.selected {
+  border-color: #22d3ee;
+  border-width: 3px;
+  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.2),
+              0 4px 16px rgba(34, 211, 238, 0.3);
+  transform: scale(1.02);
+}
+
+.react-flow__node.dragging {
+  opacity: 0.8;
+  box-shadow: 0 8px 24px rgba(34, 211, 238, 0.4);
+}
+
+/* Connection Handles - More visible and clickable */
+.react-flow__handle {
+  width: 12px;
+  height: 12px;
+  background: #22d3ee;
+  border: 2px solid #0b1221;
+  transition: all 0.2s ease;
+}
+
+.react-flow__handle:hover {
+  width: 16px;
+  height: 16px;
+  background: #06b6d4;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.6);
+}
+
+.react-flow__handle-connecting {
+  background: #06b6d4;
+  animation: pulse 0.6s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(34, 211, 238, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(34, 211, 238, 0.8);
+  }
+}
+
+/* Edge Styling - Clear connection visualization */
+.react-flow__edge-path {
   stroke: #22d3ee;
+  stroke-width: 2;
+  transition: stroke-width 0.2s;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3;
+  stroke: #06b6d4;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke-width: 3;
+  stroke: #06b6d4;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
+
+/* Connection Line - Visual feedback while connecting */
+.react-flow__connectionline {
+  stroke: #22d3ee;
+  stroke-width: 2;
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+/* Controls - Better visibility */
+.react-flow__controls {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+.react-flow__controls-button {
+  background: #1f2937;
+  border-bottom: 1px solid #374151;
+  color: #e2e8f0;
+  transition: all 0.2s;
+}
+
+.react-flow__controls-button:hover {
+  background: #374151;
+  color: #22d3ee;
+}
+
+/* MiniMap - Improved contrast */
+.react-flow__minimap {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.6);
+}
+
+.react-flow__minimap-node {
+  stroke-width: 2;
+}
+
+/* Selection Box - Clear visual indication */
+.react-flow__selectionpane {
+  background: rgba(34, 211, 238, 0.1);
+  border: 2px dashed #22d3ee;
+}
+
+/* Panel - Instructions overlay */
+.react-flow__panel {
+  margin: 10px;
 }
