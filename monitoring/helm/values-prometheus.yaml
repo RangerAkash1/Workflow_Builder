@@ -1,0 +1,25 @@
+alertmanager:
+  enabled: false
+
+server:
+  retention: 15d
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  persistentVolume:
+    enabled: false
+
+extraScrapeConfigs:
+  - job_name: backend
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets:
+          - backend:8000
+
+rbac:
+  create: true
