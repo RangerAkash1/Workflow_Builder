@@ -1,0 +1,175 @@
+/* Lightweight styling to make the layout readable during early scaffolding. */
+:root {
+  font-family: "Segoe UI", sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+body {
+  margin: 0;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr 320px;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  gap: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+
+.panel {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+header {
+  grid-column: 1 / span 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #111827;
+  border-radius: 12px;
+  border: 1px solid #1f2937;
+}
+
+h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+button {
+  background: #22d3ee;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: #0b1221;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button:hover {
+  background: #06b6d4;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.list-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.component-list button {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.chat-log {
+  flex: 1;
+  overflow-y: auto;
+  background: #0b1221;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.chat-log .bubble {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  word-wrap: break-word;
+}
+
+.chat-log .user {
+  background: #22d3ee33;
+  border: 1px solid #22d3ee55;
+}
+
+.chat-log .assistant {
+  background: #34d39933;
+  border: 1px solid #34d39955;
+}
+
+/* Responsive design for tablets */
+@media (max-width: 1200px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto auto;
+  }
+  
+  .panel {
+    grid-column: 1 !important;
+  }
+  
+  header {
+    grid-column: 1;
+  }
+}
+
+/* Responsive design for mobile devices */
+@media (max-width: 768px) {
+  .app-shell {
+    gap: 4px;
+    padding: 8px;
+  }
+  
+  .panel {
+    padding: 8px;
+    border-radius: 8px;
+  }
+  
+  header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  h1 {
+    font-size: 16px;
+  }
+  
+  button {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+  
+  .chat-log {
+    font-size: 13px;
+  }
+}
+
+/* Ensure canvas adapts properly */
+.rf-viewport {
+  background: #0b1221 !important;
+}
+
+.rf-node {
+  background: #1f2937;
+  border: 2px solid #374151;
+  border-radius: 8px;
+  padding: 10px;
+  color: #e2e8f0;
+}
+
+.rf-node.selected {
+  border-color: #22d3ee;
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+}
+
+.rf-edge {
+  stroke: #22d3ee;
+}
