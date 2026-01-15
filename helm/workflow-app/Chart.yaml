@@ -1,0 +1,14 @@
+apiVersion: v2
+name: workflow-app
+description: A Helm chart for Workflow Application with AI capabilities
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - workflow
+  - ai
+  - fastapi
+  - react
+maintainers:
+  - name: Workflow Team
+    email: team@workflow.com
