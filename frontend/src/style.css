@@ -544,3 +544,241 @@ button:disabled {
 .react-flow__panel {
   margin: 10px;
 }
+
+/* Authentication Panel Styles */
+.auth-panel {
+  max-width: 400px;
+  margin: 50px auto;
+  padding: 30px;
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.auth-panel h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  text-align: center;
+  color: #22d3ee;
+}
+
+.auth-panel .form-group {
+  margin-bottom: 16px;
+}
+
+.auth-panel label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.auth-panel input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #e2e8f0;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.auth-panel input:focus {
+  outline: none;
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.1);
+}
+
+.auth-panel button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.auth-panel .error-message {
+  padding: 10px;
+  background: #991b1b;
+  color: #fecaca;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.auth-panel .auth-toggle {
+  margin-top: 20px;
+  text-align: center;
+  color: #9ca3af;
+}
+
+.auth-panel .auth-toggle button {
+  background: none;
+  color: #22d3ee;
+  text-decoration: underline;
+  padding: 0;
+  width: auto;
+  margin-top: 0;
+}
+
+.auth-panel .auth-skip {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.auth-panel .auth-skip button {
+  background: #374151;
+  color: #9ca3af;
+}
+
+.auth-panel .auth-skip button:hover {
+  background: #4b5563;
+}
+
+/* User Info Header Styles */
+.header-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.user-info {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: #1f2937;
+  border-radius: 8px;
+}
+
+.user-info span {
+  color: #e2e8f0;
+  font-size: 14px;
+}
+
+.user-info button {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* Execution Logs Styles */
+.logs-container {
+  grid-column: 1 / span 3;
+  overflow-y: auto;
+}
+
+.execution-logs {
+  padding: 20px;
+}
+
+.logs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #1f2937;
+}
+
+.logs-header h3 {
+  margin: 0;
+  color: #22d3ee;
+  font-size: 20px;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.filter-controls label {
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.filter-controls select {
+  padding: 6px 12px;
+  background: #1f2937;
+  color: #e2e8f0;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.filter-controls select:focus {
+  outline: none;
+  border-color: #22d3ee;
+}
+
+.filter-controls button {
+  padding: 6px 16px;
+  font-size: 14px;
+}
+
+.logs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.log-entry {
+  background: #1f2937;
+  padding: 16px;
+  border-radius: 8px;
+  border-left: 4px solid #22d3ee;
+}
+
+.log-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.log-date {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.log-time {
+  color: #22d3ee;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.log-workflow,
+.log-message,
+.log-response,
+.log-error {
+  margin-bottom: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.log-workflow strong,
+.log-message strong,
+.log-response strong,
+.log-error strong {
+  color: #22d3ee;
+  margin-right: 6px;
+}
+
+.log-error {
+  color: #fca5a5;
+}
+
+.log-metadata {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #374151;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.log-metadata span {
+  display: inline-flex;
+  align-items: center;
+}
+

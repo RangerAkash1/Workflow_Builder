@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     chroma_path: str = ".chroma"  # Local path for Chroma/FAISS storage
     
     # JWT Authentication Settings
-    secret_key: str = "your-secret-key-change-this-in-production"  # CHANGE IN PRODUCTION!
+    secret_key: str = "your-secret-key-change-this-in-production" 
     jwt_algorithm: str = "HS256"
     access_token_expire_days: int = 7
     
