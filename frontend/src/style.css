@@ -514,6 +514,7 @@ button:disabled {
 /* Controls - Better visibility */
 .react-flow__controls {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  bottom: 18px !important; /* overlap fix */
 }
 
 .react-flow__controls-button {
