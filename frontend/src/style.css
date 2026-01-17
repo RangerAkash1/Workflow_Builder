@@ -19,6 +19,13 @@ body {
   box-sizing: border-box;
 }
 
+/* Center auth panel only child */
+.app-shell:has(.auth-panel:only-child) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .panel {
   background: #111827;
   border: 1px solid #1f2937;
@@ -547,9 +554,10 @@ button:disabled {
 
 /* Authentication Panel Styles */
 .auth-panel {
-  max-width: 400px;
+  width: 500px;
+  max-width: 90%;
   margin: 50px auto;
-  padding: 30px;
+  padding: 40px;
   background: #111827;
   border: 1px solid #1f2937;
   border-radius: 12px;
