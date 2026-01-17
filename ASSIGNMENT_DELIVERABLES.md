@@ -22,17 +22,6 @@ flowchart LR
   Backend -->|File Upload| Docs[(PDF Intake/Chunking)]
 ```
 
-## Demo Recording Script (4–5 minutes)
-- Launch: show backend /docs running and frontend home; mention env keys loaded.
-- Auth: register/login or choose anonymous mode; show token presence in calls.
-- Build: add user query, knowledge base, LLM engine, and output nodes; connect edges; configure provider/model/top-k.
-- Validate: run Build/Validate and surface success state.
-- Upload: configure knowledge node, upload a PDF, confirm collection appears.
-- Run: open chat panel, ask a grounded question, show response with context; toggle web search if used.
-- Persist: save workflow, load it back from manager, delete one to show CRUD.
-- Logs: open execution logs, filter by status, highlight timing/provider/context columns.
-- Close: recap stack (FastAPI + Postgres + Chroma + OpenAI/Gemini + SerpAPI) and point to README.md for setup.
-
 ## Evaluation Criteria Mapping
 - Functional correctness: verify auth, workflow CRUD, validate, chat run, document upload, logs; include healthcheck.
 - UI/UX: workflow builder clarity (drag/drop, empty states, toasts, loading); chat usability; logs readability.
