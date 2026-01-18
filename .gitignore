@@ -99,3 +99,6 @@ htmlcov/
 .LSOverride
 # Local Netlify folder
 .netlify
+
+.vercel
+.env*.local
