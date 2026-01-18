@@ -1,0 +1,23 @@
+replicas: 1
+minimumMasterNodes: 1
+
+volumeClaimTemplate:
+  resources:
+    requests:
+      storage: 10Gi
+
+esConfig:
+  elasticsearch.yml: |
+    xpack.security.enabled: false
+    discovery.type: single-node
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 1Gi
+  limits:
+    cpu: 1
+    memory: 2Gi
+
+persistence:
+  enabled: true

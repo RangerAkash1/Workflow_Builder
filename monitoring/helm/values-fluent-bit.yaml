@@ -1,0 +1,32 @@
+service:
+  type: ClusterIP
+
+backend:
+  type: logstash
+  logstash:
+    host: logstash-logstash
+    port: 5044
+
+input:
+  tail:
+    enabled: true
+    path: /var/log/containers/*.log
+    parser: docker
+    memBufLimit: 5MB
+
+parsers:
+  enabled: true
+  parsers: |
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 300m
+    memory: 256Mi

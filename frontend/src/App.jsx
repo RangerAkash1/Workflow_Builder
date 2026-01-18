@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import ComponentLibrary from "./components/ComponentLibrary";
 import WorkflowCanvas from "./components/WorkflowCanvas";
@@ -6,6 +6,8 @@ import ConfigPanel from "./components/ConfigPanel";
 import ChatPanel from "./components/ChatPanel";
 import ExecutionControls from "./components/ExecutionControls";
 import WorkflowManager from "./components/WorkflowManager";
+import AuthPanel from "./components/AuthPanel";
+import ExecutionLogs from "./components/ExecutionLogs";
 
 // Enhanced API client with error handling and retry logic
 const api = axios.create({
@@ -13,14 +15,31 @@ const api = axios.create({
   timeout: 30000, // 30 second timeout
 });
 
-// Add response interceptor to handle rate limiting
+// Add request interceptor to include auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Add response interceptor to handle rate limiting and auth errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 429) {
       console.warn("Rate limited:", error.response.data.detail);
-      // Return a user-friendly error message
       return Promise.reject(new Error("Too many requests. Please wait a moment and try again."));
+    }
+    if (error.response?.status === 401) {
+      // Token expired or invalid
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("user");
+      window.location.reload(); // Reload to show login screen
     }
     return Promise.reject(error);
   }
@@ -41,6 +60,49 @@ export default function App() {
   const [buildStatus, setBuildStatus] = useState("idle");
   const [managerOpen, setManagerOpen] = useState(false);
   const [currentWorkflowId, setCurrentWorkflowId] = useState(null);
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+
+  // Check for existing authentication on mount
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    const savedUser = localStorage.getItem("user");
+    
+    if (token && savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      } catch (err) {
+        console.error("Failed to parse saved user:", err);
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user");
+      }
+    }
+    
+    setAuthChecked(true);
+  }, []);
+
+  const handleAuthSuccess = useCallback((authenticatedUser) => {
+    setUser(authenticatedUser);
+    // If authenticatedUser is null, user chose to continue without login
+    // We set it to a special object to indicate anonymous mode
+    if (authenticatedUser === null) {
+      setUser({ username: "Anonymous", isAnonymous: true });
+    }
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
+    delete api.defaults.headers.common["Authorization"];
+    setUser(null);
+    setNodes([]);
+    setEdges([]);
+    setSelectedId(null);
+    setChatOpen(false);
+  }, []);
 
   // Add a new node with better spacing to prevent overlap
   // Uses a grid layout that adapts to screen size
@@ -158,46 +220,85 @@ export default function App() {
     setCurrentWorkflowId(null);
   }, []);
 
+  // Show loading while checking authentication
+  if (!authChecked) {
+    return <div className="app-shell">Loading...</div>;
+  }
+
+  // Show auth panel if user is null after checking (not authenticated)
+  // User can choose to login/register or skip authentication 
+  if (user === null) {
+    return (
+      <div className="app-shell">
+        <AuthPanel api={api} onAuthSuccess={handleAuthSuccess} />
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       <header>
         <h1>Workflow Builder</h1>
-        <ExecutionControls
-          onBuild={handleBuild}
-          chatOpen={chatOpen}
-          onChatOpen={() => setChatOpen(true)}
-          onManager={() => setManagerOpen(true)}
-        />
+        <div className="header-controls">
+          <div className="user-info">
+            <span>Welcome, {user?.username || "Guest"}</span>
+            {!user?.isAnonymous && (
+              <>
+                <button onClick={() => setShowLogs(!showLogs)}>
+                  {showLogs ? "Hide Logs" : "Show Logs"}
+                </button>
+                <button onClick={handleLogout}>Logout</button>
+              </>
+            )}
+            {user?.isAnonymous && (
+              <button onClick={handleLogout}>Login</button>
+            )}
+          </div>
+          <ExecutionControls
+            onBuild={handleBuild}
+            chatOpen={chatOpen}
+            onChatOpen={() => setChatOpen(true)}
+            onManager={() => setManagerOpen(true)}
+          />
+        </div>
       </header>
 
-      <div className="panel">
-        <ComponentLibrary components={COMPONENT_TYPES} onAdd={addNode} />
-      </div>
+      {showLogs ? (
+        <div className="logs-container">
+          <ExecutionLogs api={api} />
+        </div>
+      ) : (
+        <>
+          <div className="panel">
+            <ComponentLibrary components={COMPONENT_TYPES} onAdd={addNode} />
+          </div>
 
-      <div className="panel">
-        <WorkflowCanvas
-          nodes={nodes}
-          edges={edges}
-          setNodes={handleNodesChange}
-          setEdges={setEdges}
-          onSelectNode={setSelectedId}
-        />
-      </div>
+          <div className="panel">
+            <WorkflowCanvas
+              nodes={nodes}
+              edges={edges}
+              setNodes={handleNodesChange}
+              setEdges={setEdges}
+              onSelectNode={setSelectedId}
+            />
+          </div>
 
-      <div className="panel">
-        <ConfigPanel node={selectedNode} onChange={updateNodeParams} api={api} />
-      </div>
+          <div className="panel">
+            <ConfigPanel node={selectedNode} onChange={updateNodeParams} api={api} />
+          </div>
 
-      <div className="panel" style={{ gridColumn: "1 / span 3" }}>
-        <ChatPanel
-          open={chatOpen}
-          api={api}
-          workflow={{
-            nodes: nodes.map((n) => ({ id: n.id, type: n.data.type, params: n.data.params })),
-            edges,
-          }}
-        />
-      </div>
+          <div className="panel" style={{ gridColumn: "1 / span 3" }}>
+            <ChatPanel
+              open={chatOpen}
+              api={api}
+              workflow={{
+                nodes: nodes.map((n) => ({ id: n.id, type: n.data.type, params: n.data.params })),
+                edges,
+              }}
+            />
+          </div>
+        </>
+      )}
 
       {managerOpen && (
         <WorkflowManager

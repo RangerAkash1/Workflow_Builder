@@ -9,7 +9,7 @@ import time
 import chromadb
 import fitz  # PyMuPDF
 import google.generativeai as genai
-from fastapi import FastAPI, File, HTTPException, UploadFile, Request
+from fastapi import FastAPI, File, HTTPException, UploadFile, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncOpenAI
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,28 +21,40 @@ from chromadb.api import ClientAPI
 
 from .config import Settings, get_settings
 from .database import (
+    create_user,
     delete_workflow,
+    get_user_by_email,
+    get_user_by_username,
     get_workflow,
     init_db,
     list_chat_logs,
     list_documents,
+    list_execution_logs,
     list_workflows,
     save_chat_log,
     save_document_metadata,
+    save_execution_log,
     save_workflow,
     update_workflow,
+)
+from .auth import (
+    authenticate_user,
+    create_access_token,
+    get_current_user,
+    get_current_user_required,
+    get_password_hash,
 )
 
 # FastAPI initialization with proper CORS configuration
 settings = get_settings()
 
-app = FastAPI(title="No-Code Workflow API", version="0.3.0")
+app = FastAPI(title="Workflow Builder API", version="0.3.0")
 
 # Configure CORS with environment-based origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8080", "*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -260,7 +272,7 @@ async def call_llm(provider: str, prompt: str, settings: Settings, model: Option
         if not settings.gemini_api_key:
             raise HTTPException(status_code=400, detail="Gemini provider selected but GEMINI_API_KEY is missing")
         genai.configure(api_key=settings.gemini_api_key)
-        model_name = model or "gemini-1.5-flash"
+        model_name = model or "gemini-2.5-flash"
         gemini_model = genai.GenerativeModel(model_name)
         response = await asyncio.to_thread(gemini_model.generate_content, prompt)
         return response.text
@@ -338,6 +350,99 @@ async def health_check(request: Request) -> Dict[str, str]:
     return {"status": "ok"}
 
 
+# ===== Authentication Endpoints =====
+
+class UserRegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+
+
+class UserLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: Dict[str, Any]
+
+
+@app.post("/auth/register", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def register_user(request: Request, user_request: UserRegisterRequest) -> TokenResponse:
+    """Register a new user account."""
+    # Validate password length (bcrypt has 72 byte limit)
+    if len(user_request.password) > 72:
+        raise HTTPException(status_code=400, detail="Password too long. Maximum 72 characters allowed.")
+    
+    if len(user_request.password) < 6:
+        raise HTTPException(status_code=400, detail="Password too short. Minimum 6 characters required.")
+    
+    # Check if username already exists
+    existing_user = await get_user_by_username(user_request.username)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    
+    # Check if email already exists
+    existing_email = await get_user_by_email(user_request.email)
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Hash password and create user
+    hashed_password = get_password_hash(user_request.password)
+    user = await create_user(user_request.username, user_request.email, hashed_password)
+    
+    # Create access token
+    settings = get_settings()
+    access_token = create_access_token(
+        data={"sub": user["id"], "username": user["username"]},
+        settings=settings
+    )
+    
+    # Remove sensitive data
+    user_data = {k: v for k, v in user.items() if k != "hashed_password"}
+    
+    return TokenResponse(access_token=access_token, user=user_data)
+
+
+@app.post("/auth/login", response_model=TokenResponse)
+@limiter.limit("20/minute")
+async def login_user(request: Request, login_request: UserLoginRequest) -> TokenResponse:
+    """Authenticate and log in a user."""
+    user = await authenticate_user(login_request.username, login_request.password)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password"
+        )
+    
+    # Create access token
+    settings = get_settings()
+    access_token = create_access_token(
+        data={"sub": user["id"], "username": user["username"]},
+        settings=settings
+    )
+    
+    # Remove sensitive data
+    user_data = {k: v for k, v in user.items() if k != "hashed_password"}
+    
+    return TokenResponse(access_token=access_token, user=user_data)
+
+
+@app.get("/auth/me")
+@limiter.limit("60/minute")
+async def get_current_user_info(
+    request: Request,
+    current_user: dict = Depends(get_current_user_required)
+) -> Dict[str, Any]:
+    """Get current authenticated user information."""
+    # Remove sensitive data
+    user_data = {k: v for k, v in current_user.items() if k != "hashed_password"}
+    return user_data
+
+
 @app.post("/workflow/validate", response_model=None)
 @limiter.limit("60/minute")
 async def validate_workflow(request: Request, payload: WorkflowDefinition) -> Dict[str, str]:
@@ -355,10 +460,12 @@ async def upload_knowledge(
     chunk_size: int = 800,
     chunk_overlap: int = 80,
     embedding_model: Optional[str] = None,
+    current_user: Optional[dict] = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Upload a PDF, chunk it, embed it, and store it in Chroma."""
 
     settings = get_settings()
+    user_id = current_user["id"] if current_user else None
     
     # Check throttle for heavy operation
     client_ip = request.client.host
@@ -384,7 +491,8 @@ async def upload_knowledge(
         file_size=len(data),
         collection_name=collection,
         chunk_count=len(chunks),
-        embedding_model=embedding_model or "default"
+        embedding_model=embedding_model or "default",
+        user_id=user_id
     )
     
     return {
@@ -417,58 +525,109 @@ async def list_collections(request: Request) -> Dict[str, Any]:
 
 @app.post("/chat/run", response_model=None)
 @limiter.limit("40/minute")
-async def run_chat(request: Request, chat_request: ChatRequest) -> Dict[str, Any]:
+async def run_chat(
+    request: Request,
+    chat_request: ChatRequest,
+    current_user: Optional[dict] = Depends(get_current_user)
+) -> Dict[str, Any]:
     """Execute the built workflow with retrieval + LLM generation."""
-
+    
+    start_time = time.time()
     settings = get_settings()
-    nodes_by_type = validate_topology(chat_request.workflow)
+    user_id = current_user["id"] if current_user else None
+    workflow_name = None
+    error_message = None
+    
+    try:
+        nodes_by_type = validate_topology(chat_request.workflow)
 
-    llm_node = nodes_by_type["llm_engine"]
-    kb_node = nodes_by_type.get("knowledge_base")
+        llm_node = nodes_by_type["llm_engine"]
+        kb_node = nodes_by_type.get("knowledge_base")
 
-    context_chunks: List[str] = []
-    if kb_node:
-        kb_params = kb_node.params or {}
-        collection_name = kb_params.get("collection_name", "default")
-        top_k = int(kb_params.get("top_k", 4))
-        embedding_model = kb_params.get("embedding_model")
-        collection_handle = get_chroma_collection(settings, collection_name)
-        query_embedding = (await embed_texts([chat_request.message], settings, embedding_model))[0]
-        context_chunks = await query_collection(collection_handle, query_embedding, top_k=top_k)
+        context_chunks: List[str] = []
+        if kb_node:
+            kb_params = kb_node.params or {}
+            collection_name = kb_params.get("collection_name", "default")
+            top_k = int(kb_params.get("top_k", 4))
+            embedding_model = kb_params.get("embedding_model")
+            collection_handle = get_chroma_collection(settings, collection_name)
+            query_embedding = (await embed_texts([chat_request.message], settings, embedding_model))[0]
+            context_chunks = await query_collection(collection_handle, query_embedding, top_k=top_k)
 
-    web_snippets: List[str] = []
-    if llm_node.params.get("web_search"):
-        web_snippets = run_web_search(chat_request.message, settings)
+        web_snippets: List[str] = []
+        if llm_node.params.get("web_search"):
+            web_snippets = run_web_search(chat_request.message, settings)
 
-    prompt = build_prompt(
-        question=chat_request.message,
-        context=context_chunks,
-        web_snippets=web_snippets,
-        custom_prompt=llm_node.params.get("prompt"),
-    )
+        prompt = build_prompt(
+            question=chat_request.message,
+            context=context_chunks,
+            web_snippets=web_snippets,
+            custom_prompt=llm_node.params.get("prompt"),
+        )
 
-    provider = llm_node.params.get("provider") or ("openai" if settings.openai_api_key else "gemini")
-    llm_model = llm_node.params.get("model")
-    answer = await call_llm(provider, prompt, settings, llm_model, chat_request.history)
+        provider = llm_node.params.get("provider") or ("openai" if settings.openai_api_key else "gemini")
+        llm_model = llm_node.params.get("model")
+        answer = await call_llm(provider, prompt, settings, llm_model, chat_request.history)
+        
+        execution_time_ms = int((time.time() - start_time) * 1000)
 
-    # Save chat log to PostgreSQL for audit trail and history.
-    await save_chat_log(
-        workflow_uuid=None,  # Could link to saved workflow if user provides it
-        message=chat_request.message,
-        response=answer,
-        provider=provider,
-        context_used=len(context_chunks),
-        web_used=bool(web_snippets)
-    )
+        # Save chat log to PostgreSQL for audit trail and history.
+        await save_chat_log(
+            workflow_uuid=None,  # Could link to saved workflow if user provides it
+            message=chat_request.message,
+            response=answer,
+            provider=provider,
+            context_used=len(context_chunks),
+            web_used=bool(web_snippets),
+            user_id=user_id
+        )
+        
+        # Save execution log
+        await save_execution_log(
+            user_id=user_id,
+            workflow_uuid=None,
+            workflow_name=workflow_name,
+            status="success",
+            message=chat_request.message,
+            response=answer,
+            provider=provider,
+            execution_time_ms=execution_time_ms,
+            error_message=None,
+            context_used=len(context_chunks),
+            web_used=bool(web_snippets)
+        )
 
-    return {
-        "answer": answer,
-        "provider": provider,
-        "context_used": len(context_chunks),
-        "context_samples": context_chunks[:2],
-        "web_used": bool(web_snippets),
-        "web_samples": web_snippets[:2],
-    }
+        return {
+            "answer": answer,
+            "provider": provider,
+            "context_used": len(context_chunks),
+            "context_samples": context_chunks[:2],
+            "web_used": bool(web_snippets),
+            "web_samples": web_snippets[:2],
+            "execution_time_ms": execution_time_ms,
+        }
+    
+    except Exception as e:
+        execution_time_ms = int((time.time() - start_time) * 1000)
+        error_message = str(e)
+        
+        # Log the error
+        await save_execution_log(
+            user_id=user_id,
+            workflow_uuid=None,
+            workflow_name=workflow_name,
+            status="error",
+            message=chat_request.message,
+            response=None,
+            provider=None,
+            execution_time_ms=execution_time_ms,
+            error_message=error_message,
+            context_used=0,
+            web_used=False
+        )
+        
+        # Re-raise the exception
+        raise
 
 
 class WorkflowSaveRequest(BaseModel):
@@ -481,17 +640,23 @@ class WorkflowSaveRequest(BaseModel):
 
 @app.post("/workflow/save", response_model=None)
 @limiter.limit("30/minute")
-async def save_workflow_endpoint(request: Request, workflow_request: WorkflowSaveRequest) -> Dict[str, Any]:
+async def save_workflow_endpoint(
+    request: Request,
+    workflow_request: WorkflowSaveRequest,
+    current_user: Optional[dict] = Depends(get_current_user)
+) -> Dict[str, Any]:
     """Save a new workflow to the database. Returns uuid and metadata."""
     # Validate before saving.
     validate_topology(
         WorkflowDefinition(nodes=workflow_request.nodes, edges=workflow_request.edges)
     )
+    user_id = current_user["id"] if current_user else None
     result = await save_workflow(
         workflow_request.name,
         workflow_request.description or "",
         [node.model_dump() for node in workflow_request.nodes],
-        [edge.model_dump() for edge in workflow_request.edges]
+        [edge.model_dump() for edge in workflow_request.edges],
+        user_id
     )
     return result
 
@@ -508,9 +673,13 @@ async def get_workflow_endpoint(request: Request, uuid: str) -> Dict[str, Any]:
 
 @app.get("/workflows", response_model=None)
 @limiter.limit("60/minute")
-async def list_workflows_endpoint(request: Request) -> Dict[str, Any]:
-    """List all saved workflows (name, uuid, timestamps)."""
-    workflows = await list_workflows()
+async def list_workflows_endpoint(
+    request: Request,
+    current_user: Optional[dict] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """List all saved workflows (name, uuid, timestamps). Filter by user if authenticated."""
+    user_id = current_user["id"] if current_user else None
+    workflows = await list_workflows(user_id)
     return {"workflows": workflows}
 
 
@@ -546,21 +715,50 @@ async def delete_workflow_endpoint(request: Request, uuid: str) -> Dict[str, str
 
 @app.get("/documents", response_model=None)
 @limiter.limit("60/minute")
-async def list_documents_endpoint(request: Request, collection: Optional[str] = None) -> Dict[str, Any]:
+async def list_documents_endpoint(
+    request: Request,
+    collection: Optional[str] = None,
+    current_user: Optional[dict] = Depends(get_current_user)
+) -> Dict[str, Any]:
     """
     List uploaded documents with metadata.
-    Optionally filter by collection name.
+    Optionally filter by collection name and/or user.
     """
-    documents = await list_documents(collection)
+    user_id = current_user["id"] if current_user else None
+    documents = await list_documents(collection, user_id)
     return {"documents": documents}
 
 
 @app.get("/chat/history", response_model=None)
 @limiter.limit("60/minute")
-async def get_chat_history(request: Request, workflow_uuid: Optional[str] = None, limit: int = 50) -> Dict[str, Any]:
+async def get_chat_history(
+    request: Request,
+    workflow_uuid: Optional[str] = None,
+    limit: int = 50,
+    current_user: Optional[dict] = Depends(get_current_user)
+) -> Dict[str, Any]:
     """
     Retrieve chat conversation history.
-    Optionally filter by workflow uuid and limit results.
+    Optionally filter by workflow uuid, user, and limit results.
     """
-    logs = await list_chat_logs(workflow_uuid, limit)
+    user_id = current_user["id"] if current_user else None
+    logs = await list_chat_logs(workflow_uuid, user_id, limit)
+    return {"logs": logs}
+
+
+@app.get("/execution/logs", response_model=None)
+@limiter.limit("60/minute")
+async def get_execution_logs(
+    request: Request,
+    workflow_uuid: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 100,
+    current_user: Optional[dict] = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Retrieve workflow execution logs.
+    Optionally filter by workflow uuid, status, and user.
+    """
+    user_id = current_user["id"] if current_user else None
+    logs = await list_execution_logs(user_id, workflow_uuid, status, limit)
     return {"logs": logs}

@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  labels:
+    app: grafana
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  labels:
+    app: grafana
+    grafana_dashboard: "1"
+data:
+  app-overview.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": "-- Grafana --",
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "panels": [
+        {
+          "type": "stat",
+          "title": "HTTP Requests (rate)",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "rate(http_requests_total[5m])"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0},
+          "options": {"colorMode": "value", "graphMode": "area"}
+        },
+        {
+          "type": "timeseries",
+          "title": "Request Duration p95",
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 16, "x": 8, "y": 0},
+          "options": {"legend": {"displayMode": "list", "placement": "bottom"}}
+        },
+        {
+          "type": "stat",
+          "title": "Pod CPU (avg cores)",
+          "datasource": "Prometheus",
+          "targets": [
+            {"expr": "avg(rate(container_cpu_usage_seconds_total{image!='',container!='POD'}[5m]))"}
+          ],
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8}
+        },
+        {
+          "type": "stat",
+          "title": "Pod Memory (avg bytes)",
+          "datasource": "Prometheus",
+          "targets": [
+            {"expr": "avg(container_memory_working_set_bytes{image!='',container!='POD'})"}
+          ],
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8}
+        }
+      ],
+      "schemaVersion": 36,
+      "style": "dark",
+      "tags": ["starter"],
+      "time": {"from": "now-15m", "to": "now"},
+      "timezone": "browser",
+      "title": "App Overview",
+      "version": 1
+    }
