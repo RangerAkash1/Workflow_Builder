@@ -1,33 +1,6 @@
 {
-  "version": 2,
-  "projects": [
-    {
-      "name": "workflow-frontend",
-      "rootDirectory": "frontend/",
-      "buildCommand": "npm run build",
-      "outputDirectory": "dist",
-      "installCommand": "npm install",
-      "framework": "vite",
-      "env": {
-        "VITE_API_BASE_URL": "@api_base_url_frontend"
-      }
-    },
-    {
-      "name": "workflow-backend",
-      "rootDirectory": "api/",
-      "buildCommand": "pip install -r requirements.txt",
-      "outputDirectory": "./",
-      "installCommand": "pip install -r requirements.txt",
-      "framework": "python",
-      "env": {
-        "DATABASE_URL": "@database_url",
-        "OPENAI_API_KEY": "@openai_api_key",
-        "GOOGLE_API_KEY": "@google_api_key",
-        "SERPAPI_API_KEY": "@serpapi_api_key",
-        "JWT_SECRET_KEY": "@jwt_secret_key",
-        "CORS_ORIGINS": "@cors_origins",
-        "ENVIRONMENT": "@environment"
-      }
-    }
-  ]
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": "vite"
 }
