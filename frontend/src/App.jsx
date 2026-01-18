@@ -226,7 +226,7 @@ export default function App() {
   }
 
   // Show auth panel if user is null after checking (not authenticated)
-  // User can choose to login/register or skip authentication
+  // User can choose to login/register or skip authentication 
   if (user === null) {
     return (
       <div className="app-shell">
