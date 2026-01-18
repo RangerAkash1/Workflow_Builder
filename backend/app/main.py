@@ -67,6 +67,30 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Store for tracking request timestamps per IP (for throttling)
 _request_timestamps: Dict[str, List[float]] = {}
 _collection_request_timestamps: Dict[str, List[float]] = {}
+_last_cleanup = time.time()
+
+
+async def cleanup_old_timestamps():
+    """Remove old IP entries from timestamp tracking to prevent memory leak."""
+    global _last_cleanup, _request_timestamps, _collection_request_timestamps
+    current_time = time.time()
+    
+    # Cleanup every 5 minutes
+    if current_time - _last_cleanup < 300:
+        return
+    
+    _last_cleanup = current_time
+    
+    # Remove IPs with no recent activity (older than 1 hour)
+    cutoff_time = current_time - 3600
+    
+    ips_to_remove = [ip for ip, timestamps in _request_timestamps.items() if timestamps and timestamps[-1] < cutoff_time]
+    for ip in ips_to_remove:
+        del _request_timestamps[ip]
+    
+    ips_to_remove = [ip for ip, timestamps in _collection_request_timestamps.items() if timestamps and timestamps[-1] < cutoff_time]
+    for ip in ips_to_remove:
+        del _collection_request_timestamps[ip]
 
 
 # Initialize database on startup.
@@ -86,6 +110,9 @@ async def check_throttle(client_ip: str, endpoint: str = "general") -> bool:
     Check if client has exceeded throttle limits.
     Returns True if request should be allowed, False if throttled.
     """
+    # Cleanup old timestamps periodically to prevent memory leak
+    await cleanup_old_timestamps()
+    
     if not settings.throttle_enabled:
         return True
     
@@ -538,6 +565,9 @@ async def run_chat(
     workflow_name = None
     error_message = None
     
+    # Clear message history to prevent memory accumulation
+    chat_history = chat_request.history[-5:] if chat_request.history else []  # Keep only last 5 messages
+    
     try:
         nodes_by_type = validate_topology(chat_request.workflow)
 
@@ -548,7 +578,7 @@ async def run_chat(
         if kb_node:
             kb_params = kb_node.params or {}
             collection_name = kb_params.get("collection_name", "default")
-            top_k = int(kb_params.get("top_k", 4))
+            top_k = min(int(kb_params.get("top_k", 4)), 3)  # Limit to 3 chunks max to save memory
             embedding_model = kb_params.get("embedding_model")
             collection_handle = get_chroma_collection(settings, collection_name)
             query_embedding = (await embed_texts([chat_request.message], settings, embedding_model))[0]
@@ -557,6 +587,7 @@ async def run_chat(
         web_snippets: List[str] = []
         if llm_node.params.get("web_search"):
             web_snippets = run_web_search(chat_request.message, settings)
+            web_snippets = web_snippets[:2]  # Limit web snippets to prevent memory bloat
 
         prompt = build_prompt(
             question=chat_request.message,
@@ -567,13 +598,13 @@ async def run_chat(
 
         provider = llm_node.params.get("provider") or ("openai" if settings.openai_api_key else "gemini")
         llm_model = llm_node.params.get("model")
-        answer = await call_llm(provider, prompt, settings, llm_model, chat_request.history)
+        answer = await call_llm(provider, prompt, settings, llm_model, chat_history)
         
         execution_time_ms = int((time.time() - start_time) * 1000)
 
         # Save chat log to PostgreSQL for audit trail and history.
         await save_chat_log(
-            workflow_uuid=None,  # Could link to saved workflow if user provides it
+            workflow_uuid=None,
             message=chat_request.message,
             response=answer,
             provider=provider,
@@ -601,9 +632,9 @@ async def run_chat(
             "answer": answer,
             "provider": provider,
             "context_used": len(context_chunks),
-            "context_samples": context_chunks[:2],
+            "context_samples": context_chunks[:1],  # Return only 1 sample instead of 2
             "web_used": bool(web_snippets),
-            "web_samples": web_snippets[:2],
+            "web_samples": web_snippets[:1],  # Return only 1 sample instead of 2
             "execution_time_ms": execution_time_ms,
         }
     
