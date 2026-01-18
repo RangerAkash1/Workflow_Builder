@@ -3,6 +3,10 @@
   functions = "functions"
   ignore = "exit 0"
 
+[env]
+  [env.production.build]
+    python_version = "3.11.5"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
